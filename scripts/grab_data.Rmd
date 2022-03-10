@@ -246,6 +246,11 @@ sites_raw_list <- lapply(sites_csv_list, function(file_i) {
 
 site.l<-unique(wide3$event_smas_history_id)
 
+sites.all<-sites_raw_list$sites %>% 
+  rename_all(tolower) %>% 
+  rename_all(~gsub("site_","",.x)) %>%
+  rename(event_smas_history_id=history_id)
+
 sites<-sites_raw_list$sites %>% 
   rename_all(tolower) %>% 
   rename_all(~gsub("site_","",.x)) %>%
@@ -259,6 +264,9 @@ wide4<-merge(wide3,sites.short,
              by="event_smas_history_id")
 #these all joined fine so that's good
 
+tds.long<-merge(tds,sites.all,
+                by="event_smas_history_id",
+                all.x=TRUE)
 
 
 ```
@@ -297,6 +305,18 @@ eco_merge<-merge(eco_merge,sites.short,
                  by="event_smas_history_id")
 
 write.csv(eco_merge,here::here("outputs/merged_tds.csv"))
+
+#do the same for just the tds
+df<-tds.long
+df$latitude<-as.numeric(df$latitude)
+df$longitude<-as.numeric(df$longitude)
+sp::coordinates(df)=~longitude+latitude
+
+eco_merge.tds<-point.in.poly(df,ecoIII)
+
+eco_merge.tds<-fortify(eco_merge.tds@data)
+write.csv(eco_merge,here::here("outputs/merged_tds_all_streams.csv"))
+
 
 ```
 
