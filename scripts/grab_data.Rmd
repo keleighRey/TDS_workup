@@ -1,0 +1,302 @@
+---
+title: "grab_data"
+author: "Keleigh Reynolds"
+date: "3/9/2022"
+output: html_document
+params:
+  user: kareynol
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+db_path<-paste("C:/Users/",params$user,"/New York State Office of Information Technology Services/SMAS - Streams Data Modernization",sep = "")
+ 
+```
+
+
+### Chemistry data
+```{r}
+chem_path <- file.path(
+  db_path,
+  "Cleaned Files",
+  "Final_Chemistry_ITS"
+)
+# Get the file paths for the filenames with the prefix "MASTER" and
+# extension CSV.
+chem_csv_list <- list.files(
+  path = chem_path,
+  pattern = "MASTER(.+?)csv",
+  full.names = TRUE
+)
+# Identify the appropriate name for each file path.
+chem_csv_names <- case_when(
+  grepl("RESULT", chem_csv_list) ~ "result",
+  grepl("SAMPLE", chem_csv_list) ~ "sample",
+  grepl("PARAMETER", chem_csv_list) ~ "pcode",
+  
+  TRUE ~ "ERROR"
+)
+# Assign easy to reference names to filepaths.
+names(chem_csv_list) <- chem_csv_names
+# Reading in macro data -------------------------------------------------
+## Loop through CSV list, import data, store in a list.
+chem_raw_list <- lapply(chem_csv_list, function(file_i) {
+  # Import data
+  read.csv(
+    file_i,
+    na.strings = c("", "NA"),
+    stringsAsFactors = FALSE
+  )})
+# Join chem Data ----------------------------------------------------------
+
+chem.all<-merge(chem_raw_list$result,chem_raw_list$sample,
+                by.x=c("CHR_SYS_SAMPLE_CDE","CHR_SAMPLE_DEL_GRP"),
+                by.y=c("CHS_SYS_SAMPLE_CDE","CHS_SAMPLE_DEL_GRP"))
+
+
+chem.all<-chem.all %>% 
+  subset(gdata::startsWith(CHS_DEC_SAMPLE_TYPE_CDE, "N")) %>%
+  subset(CHS_SAMPLE_SOURCE=="Field") %>% 
+  subset(CHR_RESULT_TYPE_CDE %in% "TRG")
+
+#change both to numeric
+chem_raw_list$pcode$pcode.num<-as.numeric(chem_raw_list$pcode$CHEM_PARAMETER_PCODE)
+
+
+#merge pcode and chemistry
+chem<-merge(chem.all,chem_raw_list$pcode,by.x="CHR_PCODE",by.y="pcode.num",all.x = TRUE) %>% 
+  #filter out lab pH, lab temperature, and lab specific conductance
+  filter(!(CHR_PCODE %in% c(110, 136, 139, 143, 145))) %>% 
+  filter(!CHEM_PARAMETER_NAME %in% c('BROMODICHLOROMETHANE', 'BROMOFORM', 'CHLOROFORM', 'DIBROMOCHLOROMETHANE', 'P-BROMOFLUOROBENZENE', 'DIBROMOFLUOROMETHANE', 'TOLUENE-D8', '2,3-DIBROMOPROPIONIC ACID', 'DIBROMOACETIC ACID', 'DICHLOROACETIC ACID', 'MONOBROMOACETIC ACID', 'MONOCHLOROACETIC ACID', 'TRICHLOROACETIC ACID', 'MERCURY', '1-BROMO-4-FLUOROBENZENE BROMOFLUOROBENZENE)')
+         )
+
+#clean up/
+rm(chem.all)
+
+#make easier to read
+chem2<-chem %>% 
+  rename_all(tolower) %>% 
+   rename(chem_pcode=chr_pcode,
+         equis=chr_sample_del_grp_equis) %>% 
+  rename_all(~gsub("chr_","",.x)) %>% 
+  rename_all(~gsub("chem_parameter_|chs_","", .x)) %>% 
+  mutate(parameter_name=name)
+
+```
+
+```{r}
+#subset to TDS, chloride and conductivity-(from insitu)
+
+tds<-chem2 %>% 
+  filter(parameter_name=="TOTAL DISSOLVED SOLIDS") %>% 
+           # parameter_name=="CHLORIDE"|
+           # parameter_name=="CONDUCTANCE") %>% 
+  select(event_smas_history_id,event_smas_sample_date,
+         parameter_name,result_value,fraction,unit_nosp,
+         method_detect_limit,validator_qual)
+tds<-tds %>% 
+  filter(validator_qual!="R") %>% 
+  mutate(result_value=case_when(validator_qual=="U"~as.numeric(method_detect_limit)*0.5,
+                                TRUE~result_value))
+tds$event_smas_sample_date<-as.Date(tds$event_smas_sample_date,"%m/%d/%Y")
+#now bring in the insitu to merge these
+```
+
+```{r}
+field_path <- file.path(
+  db_path,
+  "Cleaned Files",
+  "Final_SBU_Field_ITS"
+)
+# Get the file paths for the filenames with the prefix "MASTER" and
+# extension CSV.
+field_csv_list <- list.files(
+  path = field_path,
+  pattern = "(.+?)csv",
+  full.names = TRUE
+)
+# Identify the appropriate name for each file path.
+field_csv_names <- case_when(
+  grepl("User_Perception", field_csv_list) ~ "userp",
+  grepl("Habitat", field_csv_list) ~ "habitat",
+  grepl("IN_SITU", field_csv_list) ~ "insitu",
+  grepl("Sample_Event", field_csv_list) ~ "sample_info",
+  TRUE ~ "ERROR"
+)
+# Assign easy to reference names to filepaths.
+names(field_csv_list) <- field_csv_names
+# Reading in macro data -------------------------------------------------
+## Loop through CSV list, import data, store in a list.
+field_raw_list <- lapply(field_csv_list, function(file_i) {
+  # Import data
+  read.csv(
+    file_i,
+    na.strings = c("", "NA"),
+    stringsAsFactors = FALSE,
+    fileEncoding = "UTF-8-BOM")})
+
+#merge insitu and pcode
+field_raw_list$insitu$pcode.num<-as.numeric(field_raw_list$insitu$ISWC_CHEM_PARAMETER_PCODE_VALID)
+
+#merge pcode and insitu
+field_raw_list$insitu<-merge(field_raw_list$insitu,chem_raw_list$pcode,by="pcode.num",all.x = TRUE)
+
+
+conduct<-field_raw_list$insitu %>% 
+  rename_all(tolower) %>% 
+  rename(insit_name=iswc_chem_parameter_name) %>% 
+  rename_all(~gsub("iswc_|chem_parameter_","",.x)) %>% 
+   mutate(parameter_name=name) %>% 
+  filter(parameter_name=="SPECIFIC CONDUCTANCE")
+  
+conduct$event_smas_sample_date<-as.Date(conduct$event_smas_sample_date,"%m/%d/%Y")
+conduct<-conduct %>% 
+  select(event_smas_history_id,event_smas_sample_date,parameter_name,result,fraction,
+         unit_nosp) %>% 
+  rename(result_value=result)
+ #merge with the conductivity from ribs routine
+
+ribs<-read.csv(here::here("data/routine.csv"))
+
+ribs<-ribs %>% 
+  mutate(parameter_name="SPECIFIC CONDUCTANCE",
+         unit_nosp="uS/cm",
+         result_value=as.numeric(Conductivity..Umhos.cm.)) %>% 
+  rename(event_smas_sample_date=Sampling.Date,
+         event_smas_history_id=Station.ID) %>% 
+  select(-c(Conductivity..Umhos.cm.,X,)) %>% 
+  mutate(event_smas_sample_date=as.Date(event_smas_sample_date,"%Y-%m-%d"))
+
+conduct<-plyr::rbind.fill(conduct,ribs)
+
+```
+
+```{r merge-data-sets}
+
+#merge to have them match, and make them wide before the join
+#check matching
+tds<-tds %>% 
+  mutate(match=paste(event_smas_history_id,event_smas_sample_date,sep="_"))
+
+conduct<-conduct %>% 
+  mutate(match=paste(event_smas_history_id,event_smas_sample_date,sep="_"))
+
+matched<-anti_join(tds,conduct,
+                   by="match")
+
+full<-plyr::rbind.fill(tds,conduct)
+
+wide<-full %>% 
+  select(-c(method_detect_limit,fraction,unit_nosp,validator_qual)) %>% 
+  distinct() %>% 
+  mutate(row=row_number(),
+         result_value=as.numeric(result_value)) %>% 
+  tidyr::pivot_wider(names_from=parameter_name,
+              values_from=result_value) %>% 
+  select(-c(row))
+
+wide2<-wide %>% 
+  select(match,`TOTAL DISSOLVED SOLIDS`,`SPECIFIC CONDUCTANCE`) %>% 
+  group_by(match) %>% 
+  summarise_all(mean,na.rm=TRUE)
+
+wide2<-na.omit(wide2)
+
+sites<-wide %>% 
+  select(match,event_smas_history_id,event_smas_sample_date)
+
+wide3<-merge(wide2,sites,by="match") %>% 
+  distinct()
+
+
+```
+
+```{r lat-long-id}
+sites_path <- file.path(
+  db_path,
+  "Cleaned Files",
+  "Final_Sites_ITS"
+)
+# Get the file paths for the filenames with the prefix "MASTER" and
+# extension CSV.
+sites_csv_list <- list.files(
+  path = sites_path,
+  pattern = "Master(.+?)csv",
+  full.names = TRUE
+)
+# Identify the appropriate name for each file path.
+sites_csv_names <- case_when(
+  grepl("Master_S_Site", sites_csv_list) ~ "sites",
+  TRUE ~ "ERROR"
+)
+# Assign easy to reference names to filepaths.
+names(sites_csv_list) <- sites_csv_names
+# Reading in macro data -------------------------------------------------
+## Loop through CSV list, import data, store in a list.
+sites_raw_list <- lapply(sites_csv_list, function(file_i) {
+  # Import data
+  read.csv(
+    file_i,
+    na.strings = c("", "NA"),
+    stringsAsFactors = FALSE,
+    fileEncoding = "UTF-8-BOM"
+  )})
+
+
+site.l<-unique(wide3$event_smas_history_id)
+
+sites<-sites_raw_list$sites %>% 
+  rename_all(tolower) %>% 
+  rename_all(~gsub("site_","",.x)) %>%
+  rename(event_smas_history_id=history_id) %>% 
+  filter(event_smas_history_id %in% site.l)
+
+sites.short<-sites %>% 
+  select(event_smas_history_id,latitude,longitude)
+
+wide4<-merge(wide3,sites.short,
+             by="event_smas_history_id")
+#these all joined fine so that's good
+
+
+
+```
+
+
+```{r merge-with-eco-region}
+
+#read in the shapefile
+library(ggmap)
+library(ggrepel)
+library(rgdal)
+library(sp)
+library(spatialEco)
+
+ecoIII<-readOGR("C:/Users/kareynol/OneDrive - New York State Office of Information Technology Services/Desktop/R_SMAS/pH_hardness_tool/data","eco_region_3")
+ecoIII<-sp::spTransform(ecoIII, sp::CRS("+proj=longlat +datum=WGS84 +no_defs"))
+
+to_coords<-function(df){
+  df$latitude<-as.numeric(df$latitude)
+df$longitude<-as.numeric(df$longitude)
+sp::coordinates(df)=~longitude+latitude
+
+}
+proj4string(df)<-CRS("+proj=longlat +datum=WGS84 +no_defs")
+
+point<-to_coords(wide4)
+
+eco_merge<-point.in.poly(df,ecoIII)
+
+
+eco_merge<-fortify(eco_merge@data)
+
+#merge the lat/long back into it
+
+eco_merge<-merge(eco_merge,sites.short,
+                 by="event_smas_history_id")
+
+write.csv(eco_merge,here::here("outputs/merged_tds.csv"))
+
+```
+

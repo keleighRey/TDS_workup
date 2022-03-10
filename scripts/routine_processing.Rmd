@@ -1,0 +1,105 @@
+---
+title: "routine"
+author: "Keleigh Reynolds"
+date: "3/10/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r read-in-routine-equis}
+
+equis_res<-read.csv("C:/Users/kareynol/New York State Office of Information Technology Services/SMAS - Streams Data Modernization/to_be_cleaned/ribs_routine_field/2001-2015_equis_YSI-RIBS_routine_plus_additional/2001-2015_equis_field_RESULT_20200122.csv")
+
+equis_sample<-read.csv("C:/Users/kareynol/New York State Office of Information Technology Services/SMAS - Streams Data Modernization/to_be_cleaned/ribs_routine_field/2001-2015_equis_YSI-RIBS_routine_plus_additional/2001-2015_equis_field_SAMPLE_20200122.csv")
+
+equis_all<-merge(equis_res,equis_sample,
+                 by="sys_sample_code")
+#these all matched, so that's good!
+
+
+```
+
+```{r frag-2015}
+#NOT DOING THIS NOW, THERE ARE MULTIPLE TABS and weird stuff, making a call
+# frag_path <- file.path("C:/Users/kareynol/New York State Office of Information Technology Services/SMAS - Streams Data Modernization/to_be_cleaned/ribs_routine_field/2015_remaining_ysi_data/")
+# # Get the file paths for the filenames with the prefix "MASTER" and
+# # extension CSV.
+# frag_list <- list.files(
+#   path = frag_path,
+#   pattern = "(.+?)xlsx",
+#   full.names = TRUE
+# )
+# # Identify the appropriate name for each file path.
+# frag_names <- case_when(
+#   grepl("EQuIS_2015JulyAugust", frag_list) ~ "julyaug",
+#   grepl("EQuIS_2015June", frag_list) ~ "june",
+#   grepl("EQuIS_2015SeptemberOctober", frag_list) ~ "septoct",
+#   
+#   TRUE ~ "ERROR"
+# )
+# # Assign easy to reference names to filepaths.
+# names(frag_list) <- frag_names
+# # Reading in macro data -------------------------------------------------
+# ## Loop through CSV list, import data, store in a list.
+# frag_raw_list <- lapply(frag_list, function(file_i) {
+#   # Import data
+#   readxl::read_excel(
+#     file_i
+#   )})
+
+```
+
+```{r routine-18-20}
+
+routine_path <- file.path("C:/Users/kareynol/New York State Office of Information Technology Services/SMAS - Routine Network/field_data/")
+# Get the file paths for the filenames with the prefix "MASTER" and
+# extension CSV.
+routine_list <- list.files(
+  path = routine_path,
+  pattern = "(.+?)xlsx",
+  full.names = TRUE
+)
+# Identify the appropriate name for each file path.
+routine_names <- case_when(
+  grepl("FieldData_2017", routine_list) ~ "c17",
+  grepl("FieldData_2018", routine_list) ~ "c18",
+  grepl("FieldData_2019", routine_list) ~ "c19",
+  grepl("FieldData_2020", routine_list) ~ "c20",
+  TRUE ~ "ERROR"
+)
+# Assign easy to reference names to filepaths.
+names(routine_list) <- routine_names
+# Reading in macro data -------------------------------------------------
+## Loop through CSV list, import data, store in a list.
+routine_raw_list <- lapply(routine_list, function(file_i) {
+  # Import data
+  readxl::read_excel(
+    file_i
+  )})
+
+my_merge<-function(x){
+  plyr::rbind.fill(x)
+}
+
+#combo<-Reduce(merge,routine_raw_list)
+
+combo<-plyr::rbind.fill(routine_raw_list$c17,routine_raw_list$c18,
+                         routine_raw_list$c19,routine_raw_list$c20)
+
+combo<-combo %>% 
+  filter(!is.na(`Station ID`))
+
+#select columns and get values
+combo2<-combo %>% 
+  select(`Station ID`,`Sampling Date`,`Conductivity (Umhos/cm)`) %>% 
+  distinct() %>% 
+  filter(`Conductivity (Umhos/cm)` !="N/A" )
+
+write.csv(combo2,here::here("data/routine.csv"))
+
+```
+
+
