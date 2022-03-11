@@ -245,11 +245,13 @@ sites_raw_list <- lapply(sites_csv_list, function(file_i) {
 
 
 site.l<-unique(wide3$event_smas_history_id)
+#site.l<-unique(conduct$event_smas_history_id)
 
 sites.all<-sites_raw_list$sites %>% 
   rename_all(tolower) %>% 
   rename_all(~gsub("site_","",.x)) %>%
-  rename(event_smas_history_id=history_id)
+  rename(event_smas_history_id=history_id) %>% 
+  select(event_smas_history_id,latitude,longitude)
 
 sites<-sites_raw_list$sites %>% 
   rename_all(tolower) %>% 
@@ -267,7 +269,15 @@ wide4<-merge(wide3,sites.short,
 tds.long<-merge(tds,sites.all,
                 by="event_smas_history_id",
                 all.x=TRUE)
+conduct<-conduct %>% 
+  mutate(year=lubridate::year(event_smas_sample_date)) %>% 
+  filter(year>=2001)
 
+conduct.long<-merge(conduct,sites.all,
+                    by="event_smas_history_id",
+                all.x=TRUE)
+conduct.long<-conduct.long %>% 
+  filter(latitude!="")
 
 ```
 
@@ -312,10 +322,40 @@ df$latitude<-as.numeric(df$latitude)
 df$longitude<-as.numeric(df$longitude)
 sp::coordinates(df)=~longitude+latitude
 
+proj4string(df)<-CRS("+proj=longlat +datum=WGS84 +no_defs")
+
 eco_merge.tds<-point.in.poly(df,ecoIII)
 
+
 eco_merge.tds<-fortify(eco_merge.tds@data)
-write.csv(eco_merge,here::here("outputs/merged_tds_all_streams.csv"))
+write.csv(eco_merge.tds,here::here("outputs/merged_tds_all_streams.csv"))
+
+
+#same for all conductivity
+conduct2<-conduct.long
+conduct_all<-merge(conduct2,sites.all,
+                by="event_smas_history_id",
+                all.x=TRUE)
+
+df<-conduct_all %>% 
+  filter(latitude!="")
+df$latitude<-as.numeric(df$latitude)
+df$longitude<-as.numeric(df$longitude)
+sp::coordinates(df)=~longitude+latitude
+
+proj4string(df)<-CRS("+proj=longlat +datum=WGS84 +no_defs")
+
+
+eco_merge.conduct<-point.in.poly(df,ecoIII)
+
+eco_merge.conduct<-fortify(eco_merge.conduct@data)
+
+eco_merge.conduct<-eco_merge.conduct %>% 
+  mutate(year=lubridate::year(event_smas_sample_date)) %>% 
+  filter(year>=2001)
+
+write.csv(eco_merge.conduct,here::here("outputs/merged_conduct_all_streams.csv"))
+
 
 
 ```
