@@ -49,7 +49,7 @@ tds_ecoregions_stats<-merged_tds %>%
   distinct(event_smas_history_id, year, median_TDS, .keep_all = TRUE) %>% 
   ggplot(aes(US_L3NAME, median_TDS))+
   geom_boxplot()+
-  ylab("TDS (mg/L")+
+  ylab(" Actual TDS (mg/L")+
   xlab("Ecoregion")+
   coord_cartesian(ylim = c(0,1200))+
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
@@ -80,6 +80,11 @@ merged_tds %>%
   geom_point()+
   xlab("Actual TDS (mg/L")+ylab("Predicted TDS (mg/L")+
   annotate("text", x=1000, y=3000, label = "RMSE = 81.40084")
+
+
+merged_conduct_all_streams<-merged_conduct_all_streams %>% 
+   mutate(pred_TDS=3+(0.563565*result_value))
+
 
 
 predicted_stream_TDS_ecoregion_stats<-merged_conduct_all_streams %>%
@@ -115,6 +120,8 @@ predicted_streams_tds_ecoregion_plot<-merged_conduct_all_streams %>%
 
 
 ```
+
+
 ```{r}
 setwd("C:/Users/mpkraft/OneDrive - New York State Office of Information Technology Services/Lakes Database/Current")
 
