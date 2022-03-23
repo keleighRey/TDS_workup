@@ -1,0 +1,289 @@
+---
+title: "LMAS/SMAS TDS Analysis"
+author: "Matthew Kraft"
+date: "3/18/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load data & packages, include=FALSE}
+
+library(tidyverse)
+library(Metrics)
+library(kableExtra)
+merged_tds <- read_csv(file.path(here::here(),
+                              "data",
+                              "merged_tds.csv"))
+
+merged_conduct_all_streams<- read_csv(file.path(here::here(),
+                              "data",
+                              "merged_conduct_all_streams.csv"))
+
+```
+
+
+# Lakes and Streams Actual and Predicted TDS 
+
+## Actual Stream TDS Ecoregional Distribution (RIBS Routine Sites)
+
+```{r, Summarise known TDS values by level III ecoregion, echo = FALSE, fig.align= 'center', warning=FALSE}
+
+tds_ecoregions_stats<-merged_tds %>%
+  filter(event_smas_history_id!="02-BLHL-0.5") %>% 
+  group_by(event_smas_history_id) %>%
+  mutate(median_TDS = median(TOTAL.DISSOLVED.SOLIDS)) %>% 
+  ungroup() %>% 
+  distinct(event_smas_history_id, median_TDS, .keep_all = TRUE) %>% 
+  group_by(US_L3CODE) %>% 
+  mutate(median = median(median_TDS)) %>% 
+  mutate(q_80 = quantile(median_TDS, probs = 0.80)) %>% 
+  mutate(q_75 = quantile(median_TDS, probs = 0.75)) %>% 
+  ungroup() %>%
+  group_by(US_L3CODE) %>% 
+  mutate(n = n()) %>% 
+  ungroup() %>% 
+  distinct(US_L3CODE, US_L3NAME, median, q_80, q_75, n) %>% 
+  select(US_L3CODE, US_L3NAME, median, q_75, q_80, n) %>% 
+  arrange(US_L3CODE)
+
+
+ tds_ecoregion_plot<-merged_tds %>%
+   filter(event_smas_history_id!="02-BLHL-0.5") %>% 
+  group_by(event_smas_history_id) %>%
+  mutate(median_TDS = median(TOTAL.DISSOLVED.SOLIDS)) %>% 
+  ungroup() %>% 
+  distinct(event_smas_history_id, median_TDS, .keep_all = TRUE) %>% 
+  ggplot(aes(US_L3NAME, median_TDS))+
+  geom_boxplot()+
+  ylab(" Actual TDS (mg/L)")+
+  xlab("Ecoregion")+
+  coord_cartesian(ylim = c(0,1250))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
+
+ tds_ecoregion_plot
+ 
+kable(
+  tds_ecoregions_stats,
+  col.names = c("Ecoregion #", "*Ecoregion Name*", "*Median*", "*75th percentile*", "*80th percentile*", "# of observations"),
+  digits = 2,
+  caption = "Stream Ecoregional TDS (mg/L) Distribution "
+  ) %>% 
+   kable_styling(position = "center")
+
+
+```
+
+## Modeling TDS based on Specific Conductance
+
+```{r, moedling TDS using specific conductance, echo = FALSE, fig.align='center', warning=FALSE, results='hide'}
+model<-lm(merged_tds$TOTAL.DISSOLVED.SOLIDS~merged_tds$SPECIFIC.CONDUCTANCE)
+
+summary(model)
+
+merged_tds %>% 
+  ggplot(aes(TOTAL.DISSOLVED.SOLIDS, SPECIFIC.CONDUCTANCE))+ 
+  geom_point()+
+  xlab("TDS (mg/L)")+ylab("Specific Conductance (uS/cm)")+
+  annotate("text", x = 1000, y = 6000, label = "R-squared = 0.9643, p-value <2e-16 ") + 
+  annotate("text", x = 3500, y = 2000, label = "TDS = (0.563565 * Specific Conductance) + 3.965894" )
+  
+
+merged_tds$pred_TDS<-predict(model, newdata = merged_tds)
+
+rmse(merged_tds$TOTAL.DISSOLVED.SOLIDS, merged_tds$pred_TDS)
+
+merged_tds %>% 
+  ggplot(aes(TOTAL.DISSOLVED.SOLIDS, pred_TDS))+ 
+  geom_point()+
+  xlab("Actual TDS (mg/L)")+ylab("Predicted TDS (mg/L)")+
+  annotate("text", x=1000, y=3000, label = "RMSE = 81.40084")
+
+
+merged_conduct_all_streams<-merged_conduct_all_streams %>% 
+   mutate(pred_TDS=3.965894+(0.563565*result_value))
+```
+
+## Predicted Stream TDS Ecoregional Distribution (All Sites)
+
+```{r, TDS vs. Conductivity Linear Model, echo = FALSE, fig.align= 'center', message=FALSE, warning=FALSE, results='hide'}
+predicted_stream_TDS_ecoregion_stats<-merged_conduct_all_streams %>%
+  filter(!is.na(US_L3NAME)) %>% 
+  group_by(event_smas_history_id) %>%
+  mutate(median_TDS = median(pred_TDS)) %>% 
+  ungroup() %>% 
+  distinct(event_smas_history_id, median_TDS, .keep_all = TRUE) %>% 
+  group_by(US_L3CODE) %>% 
+  mutate(median = median(median_TDS)) %>% 
+  mutate(q_80 = quantile(median_TDS, probs = 0.80)) %>% 
+  mutate(q_75 = quantile(median_TDS, probs = 0.75)) %>% 
+  ungroup() %>%
+  group_by(US_L3CODE) %>% 
+  mutate(n = n()) %>% 
+  ungroup() %>%
+  distinct(US_L3CODE, US_L3NAME, median,  q_75, q_80, n) %>% 
+  select(US_L3CODE, US_L3NAME, median,  q_75, q_80, n)%>% 
+  arrange(US_L3CODE)
+
+
+predicted_streams_tds_ecoregion_plot<-merged_conduct_all_streams %>%
+  filter(!is.na(US_L3NAME)) %>% 
+  group_by(event_smas_history_id) %>%
+  mutate(median_TDS = median(pred_TDS)) %>% 
+  ungroup() %>% 
+  distinct(event_smas_history_id, year, median_TDS, .keep_all = TRUE) %>% 
+  ggplot(aes(US_L3NAME, median_TDS))+
+  geom_boxplot()+
+  ylab("Predicted TDS (mg/L)")+
+  xlab("Ecoregion")+
+  coord_cartesian(ylim = c(0,1250))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
+
+
+```
+
+
+```{r, predicted plots & stats, echo = FALSE, fig.align='center', message=FALSE, warning=FALSE}
+predicted_streams_tds_ecoregion_plot
+ 
+kable(
+  predicted_stream_TDS_ecoregion_stats,
+  col.names = c("Ecoregion #", "*Ecoregion Name*", "*Median*", "*75th percentile*", "*80th percentile*", "# of observations"),
+  digits = 2,
+  caption = "Stream Ecoregional (predicted) TDS (mg/L) Distribution "
+  ) %>% 
+   kable_styling(position = "center")
+ 
+```
+
+
+
+```{r, inlcude = FALSE, echo=FALSE, results='hide'}
+setwd("C:/Users/mpkraft/OneDrive - New York State Office of Information Technology Services/Lakes Database/Current")
+
+source("C:/Users/mpkraft/OneDrive - New York State Office of Information Technology Services/Lakes Database/Current/new_database/Reading.LMAS.Data.R")
+
+```
+## Predicted Lakes TDS Distribution
+```{r, summarise lakes data, echo = FALSE, fig.align='center', message=FALSE, warning=FALSE, results='hide'}
+lake_ecoregions <- read_csv(file.path(here::here(),
+                              "data",
+                              "lake_ecoregions.csv"))
+
+lakes_cond<-newdata %>% 
+  filter(CHARACTERISTIC_NAME == "SPECIFIC CONDUCTANCE") %>% 
+  filter(INFORMATION_TYPE == "DP") %>% 
+  filter(SAMPLE_DATE > "2001/01/01")
+
+
+lakes_cond_epi<-lakes_cond %>% 
+  filter(RSLT_PROFILE_DEPTH<=2) %>%
+  select(LAKE_HISTORY_ID, RSLT_RESULT_VALUE, RSLT_PROFILE_DEPTH) %>% 
+  group_by(LAKE_HISTORY_ID) %>% 
+  mutate(median_spc = median(RSLT_RESULT_VALUE)) %>% 
+  ungroup() %>% 
+  distinct(LAKE_HISTORY_ID, median_spc)
+
+lakes_TDS_epi<-lakes_cond_epi %>% 
+  mutate(pred_median_TDS=3.965894+(0.563565*median_spc))
+
+lakes_TDS_epi<-inner_join(lakes_TDS_epi, lake_ecoregions, by ="LAKE_HISTORY_ID")
+
+predicted_lake_epi_TDS_ecoregion_stats<-lakes_TDS_epi %>%
+  group_by(US_L3CODE) %>% 
+  mutate(median = median(pred_median_TDS)) %>% 
+  mutate(q_80 = quantile(pred_median_TDS, probs = 0.80)) %>% 
+  mutate(q_75 = quantile(pred_median_TDS, probs = 0.75)) %>% 
+  ungroup()%>%
+  group_by(US_L3CODE) %>% 
+  mutate(n = n()) %>% 
+  ungroup() %>% 
+  distinct(US_L3CODE, US_L3NAME, median, q_80, q_75, n) %>% 
+  select(US_L3CODE, US_L3NAME, median, q_75, q_80, n) %>% 
+  arrange(US_L3CODE)
+
+predicted_lake_epi_tds_ecoregion_plot<-lakes_TDS_epi %>%
+  ggplot(aes(US_L3NAME, pred_median_TDS))+
+  geom_boxplot()+
+  ylab("Predicted Epilimnetic TDS (mg/L)")+ 
+  xlab("Ecoregion")+
+  coord_cartesian(ylim = c(0,1000))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
+
+
+lakes_cond_hypo<-lakes_cond %>%
+  select(LAKE_HISTORY_ID, SAMPLE_DATE, RSLT_RESULT_VALUE, RSLT_PROFILE_DEPTH) %>%
+  filter(RSLT_PROFILE_DEPTH > 5.0) %>% 
+  group_by(LAKE_HISTORY_ID, SAMPLE_DATE) %>% 
+  mutate(max_profile_depth = max(RSLT_PROFILE_DEPTH)) %>% 
+  mutate(profile_bottom_depth_interval = max_profile_depth - 2) %>%
+  filter(RSLT_PROFILE_DEPTH>=profile_bottom_depth_interval) %>% 
+  ungroup()
+
+
+lakes_cond_hypo<-lakes_cond_hypo %>% 
+  select(LAKE_HISTORY_ID, RSLT_RESULT_VALUE, RSLT_PROFILE_DEPTH) %>% 
+  group_by(LAKE_HISTORY_ID) %>% 
+  mutate(median_spc = median(RSLT_RESULT_VALUE)) %>% 
+  ungroup() %>% 
+  distinct(LAKE_HISTORY_ID, median_spc)
+
+lakes_TDS_hypo<-lakes_cond_hypo %>% 
+  mutate(pred_median_TDS=3.965894+(0.563565*median_spc))
+
+lakes_TDS_hypo<-inner_join(lakes_TDS_hypo, lake_ecoregions, by ="LAKE_HISTORY_ID")
+
+
+predicted_lake_hypo_TDS_ecoregion_stats<-lakes_TDS_hypo %>%
+  group_by(US_L3CODE) %>% 
+  mutate(median = median(pred_median_TDS)) %>% 
+  mutate(q_80 = quantile(pred_median_TDS, probs = 0.80)) %>% 
+  mutate(q_75 = quantile(pred_median_TDS, probs = 0.75)) %>% 
+  ungroup()%>%
+  group_by(US_L3CODE) %>% 
+  mutate(n = n()) %>% 
+  ungroup() %>% 
+  distinct(US_L3CODE, US_L3NAME, median, q_80, q_75, n)%>% 
+  select(US_L3CODE, US_L3NAME, median, q_75, q_80, n) %>% 
+  arrange(US_L3CODE)
+
+
+predicted_lake_hypo_tds_ecoregion_plot<-lakes_TDS_hypo %>%
+  ggplot(aes(US_L3NAME, pred_median_TDS))+
+  geom_boxplot()+
+  ylab(" Predicted Hypolimnetic TDS (mg/L)")+ 
+  xlab("Ecoregion")+
+  coord_cartesian(ylim = c(0,1000))+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
+
+
+```
+```{r, predicted lake plots and stats, echo = FALSE, fig.align='center', message=FALSE, warning=FALSE,}
+
+predicted_lake_epi_tds_ecoregion_plot
+ 
+ 
+kable(
+  predicted_lake_epi_TDS_ecoregion_stats,
+  col.names = c("Ecoregion #", "*Ecoregion Name*", "*Median*", "*75th percentile*", "*80th percentile*", "# of observations"),
+  digits = 2,
+  caption = "Predicted Lake Epilimnetic TDS (mg/L) Distribution"
+  ) %>% 
+   kable_styling(position = "center")
+  
+
+ predicted_lake_hypo_tds_ecoregion_plot
+ 
+kable(
+  predicted_lake_hypo_TDS_ecoregion_stats,
+  col.names = c("Ecoregion #", "*Ecoregion Name*", "*Median*", "*75th percentile*", "*80th percentile*", "# of observations"),
+  digits = 2,
+  caption = "Predicted Lake Hypolimnetic TDS (mg/L) Distribution"
+  ) %>% 
+   kable_styling(position = "center")
+
+
+```
+
