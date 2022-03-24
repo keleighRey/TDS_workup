@@ -24,10 +24,12 @@ merged_conduct_all_streams<- read_csv(file.path(here::here(),
 
 ```
 
+## New York Level III Ecoregions
 
-# Lakes and Streams Actual and Predicted TDS 
+![](/Users/mpkraft/OneDrive - New York State Office of Information Technology Services/Documents/R/TDS_workup/data/NY_Level_III_Ecoregions_Map.jpg){#id .class width=80% height=80%}
 
-## Actual Stream TDS Ecoregional Distribution (RIBS Routine Sites)
+
+## Actual Stream TDS Ecoregional Distribution
 
 ```{r, Summarise known TDS values by level III ecoregion, echo = FALSE, fig.align= 'center', warning=FALSE}
 
@@ -60,14 +62,14 @@ tds_ecoregions_stats<-merged_tds %>%
   geom_boxplot()+
   ylab(" Actual TDS (mg/L)")+
   xlab("Ecoregion")+
-  coord_cartesian(ylim = c(0,1250))+
+  coord_cartesian(ylim = c(0,800))+
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
 
  tds_ecoregion_plot
  
 kable(
   tds_ecoregions_stats,
-  col.names = c("Ecoregion #", "*Ecoregion Name*", "*Median*", "*75th percentile*", "*80th percentile*", "# of observations"),
+  col.names = c("Ecoregion #", "*Ecoregion Name*", "*Median*", "*75th percentile*", "*80th percentile*", "# of sites"),
   digits = 2,
   caption = "Stream Ecoregional TDS (mg/L) Distribution "
   ) %>% 
@@ -106,6 +108,7 @@ merged_conduct_all_streams<-merged_conduct_all_streams %>%
    mutate(pred_TDS=3.965894+(0.563565*result_value))
 ```
 
+
 ## Predicted Stream TDS Ecoregional Distribution (All Sites)
 
 ```{r, TDS vs. Conductivity Linear Model, echo = FALSE, fig.align= 'center', message=FALSE, warning=FALSE, results='hide'}
@@ -138,7 +141,7 @@ predicted_streams_tds_ecoregion_plot<-merged_conduct_all_streams %>%
   geom_boxplot()+
   ylab("Predicted TDS (mg/L)")+
   xlab("Ecoregion")+
-  coord_cartesian(ylim = c(0,1250))+
+  coord_cartesian(ylim = c(0,800))+
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
 
 
@@ -150,7 +153,7 @@ predicted_streams_tds_ecoregion_plot
  
 kable(
   predicted_stream_TDS_ecoregion_stats,
-  col.names = c("Ecoregion #", "*Ecoregion Name*", "*Median*", "*75th percentile*", "*80th percentile*", "# of observations"),
+  col.names = c("Ecoregion #", "*Ecoregion Name*", "*Median*", "*75th percentile*", "*80th percentile*", "# of sites"),
   digits = 2,
   caption = "Stream Ecoregional (predicted) TDS (mg/L) Distribution "
   ) %>% 
@@ -209,7 +212,7 @@ predicted_lake_epi_tds_ecoregion_plot<-lakes_TDS_epi %>%
   geom_boxplot()+
   ylab("Predicted Epilimnetic TDS (mg/L)")+ 
   xlab("Ecoregion")+
-  coord_cartesian(ylim = c(0,1000))+
+  coord_cartesian(ylim = c(0,800))+
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
 
 
@@ -255,7 +258,7 @@ predicted_lake_hypo_tds_ecoregion_plot<-lakes_TDS_hypo %>%
   geom_boxplot()+
   ylab(" Predicted Hypolimnetic TDS (mg/L)")+ 
   xlab("Ecoregion")+
-  coord_cartesian(ylim = c(0,1000))+
+  coord_cartesian(ylim = c(0,800))+
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) 
 
 
@@ -267,7 +270,7 @@ predicted_lake_epi_tds_ecoregion_plot
  
 kable(
   predicted_lake_epi_TDS_ecoregion_stats,
-  col.names = c("Ecoregion #", "*Ecoregion Name*", "*Median*", "*75th percentile*", "*80th percentile*", "# of observations"),
+  col.names = c("Ecoregion #", "*Ecoregion Name*", "*Median*", "*75th percentile*", "*80th percentile*", "# of sites"),
   digits = 2,
   caption = "Predicted Lake Epilimnetic TDS (mg/L) Distribution"
   ) %>% 
@@ -278,7 +281,7 @@ kable(
  
 kable(
   predicted_lake_hypo_TDS_ecoregion_stats,
-  col.names = c("Ecoregion #", "*Ecoregion Name*", "*Median*", "*75th percentile*", "*80th percentile*", "# of observations"),
+  col.names = c("Ecoregion #", "*Ecoregion Name*", "*Median*", "*75th percentile*", "*80th percentile*", "# of sites"),
   digits = 2,
   caption = "Predicted Lake Hypolimnetic TDS (mg/L) Distribution"
   ) %>% 
