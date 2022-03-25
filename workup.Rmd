@@ -1,0 +1,36 @@
+---
+title: "tds_streams_workup"
+author: "Keleigh Reynolds"
+date: "3/10/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+```
+
+```{r read-in-raw}
+
+raw<-read.csv(here::here("outputs/merged_tds_all_streams.csv"))
+
+#can remove super huge outlier
+raw<-raw %>% 
+  filter(result_value<56900)
+
+```
+
+```{r group-and-process}
+
+hist<-ggplot(raw,aes(result_value))+
+  geom_histogram(bins = 5)
+hist
+#right skewed, def nonpara
+scat<-ggplot(raw,aes(US_L3NAME,result_value))+
+  geom_boxplot()
+scat
+
+
+
+```
+
