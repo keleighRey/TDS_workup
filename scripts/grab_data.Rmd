@@ -95,11 +95,28 @@ tds<-chem2 %>%
   select(event_smas_history_id,event_smas_sample_date,
          parameter_name,result_value,fraction,unit_nosp,
          method_detect_limit,validator_qual)
+
 tds<-tds %>% 
   filter(validator_qual!="R") %>% 
   mutate(result_value=case_when(validator_qual=="U"~as.numeric(method_detect_limit)*0.5,
                                 TRUE~result_value))
 tds$event_smas_sample_date<-as.Date(tds$event_smas_sample_date,"%m/%d/%Y")
+
+#same for chloride
+chloride<-chem2 %>% 
+  filter(parameter_name=="CHLORIDE") %>% 
+  select(event_smas_history_id,event_smas_sample_date,
+         parameter_name,result_value,fraction,unit_nosp,
+         method_detect_limit,validator_qual)
+
+chloride<-chloride %>% 
+  filter(validator_qual!="R") %>% 
+  mutate(result_value=case_when(validator_qual=="U"~as.numeric(method_detect_limit)*0.5,
+                                TRUE~result_value))
+chloride$event_smas_sample_date<-as.Date(chloride$event_smas_sample_date,"%m/%d/%Y")
+
+
+
 #now bring in the insitu to merge these
 ```
 
@@ -195,6 +212,15 @@ wide<-full %>%
   tidyr::pivot_wider(names_from=parameter_name,
               values_from=result_value) %>% 
   select(-c(row))
+#pivot the chloride
+chloride_wide<-chloride %>% 
+    select(-c(method_detect_limit,fraction,unit_nosp,validator_qual)) %>% 
+  distinct() %>% 
+  mutate(row=row_number(),
+         result_value=as.numeric(result_value)) %>% 
+  tidyr::pivot_wider(names_from=parameter_name,
+              values_from=result_value) %>% 
+  select(-c(row))
 
 wide2<-wide %>% 
   select(match,`TOTAL DISSOLVED SOLIDS`,`SPECIFIC CONDUCTANCE`) %>% 
@@ -246,6 +272,7 @@ sites_raw_list <- lapply(sites_csv_list, function(file_i) {
 
 site.l<-unique(wide3$event_smas_history_id)
 #site.l<-unique(conduct$event_smas_history_id)
+site.l.chl<-unique(chloride_wide$event_smas_history_id)
 
 sites.all<-sites_raw_list$sites %>% 
   rename_all(tolower) %>% 
@@ -257,7 +284,8 @@ sites<-sites_raw_list$sites %>%
   rename_all(tolower) %>% 
   rename_all(~gsub("site_","",.x)) %>%
   rename(event_smas_history_id=history_id) %>% 
-  filter(event_smas_history_id %in% site.l)
+  #filter(event_smas_history_id %in% site.l)
+  filter(event_smas_history_id %in% site.l.chl)
 
 sites.short<-sites %>% 
   select(event_smas_history_id,latitude,longitude)
@@ -265,7 +293,8 @@ sites.short<-sites %>%
 wide4<-merge(wide3,sites.short,
              by="event_smas_history_id")
 #these all joined fine so that's good
-
+chloride_wide_2<-merge(chloride_wide,sites.short,
+             by="event_smas_history_id")
 tds.long<-merge(tds,sites.all,
                 by="event_smas_history_id",
                 all.x=TRUE)
@@ -273,10 +302,17 @@ conduct<-conduct %>%
   mutate(year=lubridate::year(event_smas_sample_date)) %>% 
   filter(year>=2001)
 
+chloride_wide_2<-chloride_wide_2 %>% 
+  mutate(year=lubridate::year(event_smas_sample_date)) %>% 
+  filter(year>=2001)
+
 conduct.long<-merge(conduct,sites.all,
                     by="event_smas_history_id",
                 all.x=TRUE)
 conduct.long<-conduct.long %>% 
+  filter(latitude!="")
+
+chloride_wide_2<-chloride_wide_2 %>% 
   filter(latitude!="")
 
 ```
@@ -294,6 +330,8 @@ library(spatialEco)
 ecoIII<-readOGR("C:/Users/kareynol/OneDrive - New York State Office of Information Technology Services/Desktop/R_SMAS/pH_hardness_tool/data","eco_region_3")
 ecoIII<-sp::spTransform(ecoIII, sp::CRS("+proj=longlat +datum=WGS84 +no_defs"))
 
+df<-chloride_wide_2
+
 to_coords<-function(df){
   df$latitude<-as.numeric(df$latitude)
 df$longitude<-as.numeric(df$longitude)
@@ -302,8 +340,8 @@ sp::coordinates(df)=~longitude+latitude
 }
 proj4string(df)<-CRS("+proj=longlat +datum=WGS84 +no_defs")
 
-point<-to_coords(wide4)
-
+#point<-to_coords(wide4)
+sf::sf_use_s2(FALSE)
 eco_merge<-point.in.poly(df,ecoIII)
 
 
@@ -314,7 +352,7 @@ eco_merge<-fortify(eco_merge@data)
 eco_merge<-merge(eco_merge,sites.short,
                  by="event_smas_history_id")
 
-write.csv(eco_merge,here::here("outputs/merged_tds.csv"))
+write.csv(eco_merge,here::here("outputs/merged_chloride.csv"))
 
 #do the same for just the tds
 df<-tds.long
