@@ -27,7 +27,7 @@ merged_conduct_all_streams<- read_csv(file.path(here::here(),
 
 # Overview {.tabset .tabset-fade .tabset-pills}
 
-Stream and lake data collected since 2001 were summarized by grouping by each site (stream site or lake) and the median value over the period of the record was calculated. This was done to reduce the influence of waterbodies which were sample multiple times skewing the resulting summary statistics. For lake data, epilimnetic and hypolimnetic data were analyzed separately. 
+Stream and lake data collected since 2001 were summarized by grouping by each site (stream site or lake) and the median value over the period of the record was calculated. This was done to reduce the influence of waterbodies which were sampled multiple times skewing the resulting summary statistics. For lake data, epilimnetic and hypolimnetic data were analyzed separately. 
 
 The secondary grouping variables used were Level III Ecoregion and Waterbody Classification. To simplify the number of categories for waterbody classifications, (T) and (TS) designations were ignored in the summary. Also, waterbodies designated as AA-S were treated as AA.  
 
@@ -40,11 +40,11 @@ The secondary grouping variables used were Level III Ecoregion and Waterbody Cla
 tds_ecoregions_stats<-merged_tds %>%
   filter(event_smas_history_id!="02-BLHL-0.5") %>% 
   group_by(event_smas_history_id) %>%
-  mutate(median_TDS = median(TOTAL.DISSOLVED.SOLIDS)) %>% 
+  mutate(median_TDS = median(TOTAL.DISSOLVED.SOLIDS, na.rm = TRUE)) %>% 
   ungroup() %>% 
   distinct(event_smas_history_id, median_TDS, .keep_all = TRUE) %>% 
   group_by(US_L3CODE) %>% 
-  mutate(median = median(median_TDS)) %>%
+  mutate(median = median(median_TDS, na.rm = TRUE)) %>%
   mutate(q_25 = quantile(median_TDS, probs = 0.25)) %>%
   mutate(q_80 = quantile(median_TDS, probs = 0.80)) %>% 
   mutate(q_75 = quantile(median_TDS, probs = 0.75)) %>% 
@@ -61,7 +61,7 @@ knitr::include_graphics('/Users/mpkraft/OneDrive - New York State Office of Info
  tds_ecoregion_plot<-merged_tds %>%
   filter(event_smas_history_id!="02-BLHL-0.5") %>% 
   group_by(event_smas_history_id) %>%
-  mutate(median_TDS = median(TOTAL.DISSOLVED.SOLIDS)) %>% 
+  mutate(median_TDS = median(TOTAL.DISSOLVED.SOLIDS, na.rm = TRUE)) %>% 
   ungroup() %>% 
   distinct(event_smas_history_id, median_TDS, .keep_all = TRUE) %>% 
   ggplot(aes(US_L3NAME, median_TDS))+
@@ -126,7 +126,7 @@ predicted_stream_TDS_ecoregion_stats<-merged_conduct_all_streams %>%
   ungroup() %>% 
   distinct(event_smas_history_id, median_TDS, .keep_all = TRUE) %>% 
   group_by(US_L3CODE) %>% 
-  mutate(median = median(median_TDS)) %>% 
+  mutate(median = median(median_TDS, na.rm = TRUE)) %>% 
   mutate(q_25 = quantile(median_TDS, probs = 0.25)) %>%
   mutate(q_80 = quantile(median_TDS, probs = 0.80)) %>% 
   mutate(q_75 = quantile(median_TDS, probs = 0.75)) %>% 
@@ -142,7 +142,7 @@ predicted_stream_TDS_ecoregion_stats<-merged_conduct_all_streams %>%
 predicted_streams_tds_ecoregion_plot<-merged_conduct_all_streams %>%
   filter(!is.na(US_L3NAME)) %>% 
   group_by(event_smas_history_id) %>%
-  mutate(median_TDS = median(pred_TDS)) %>% 
+  mutate(median_TDS = median(pred_TDS, na.rm = TRUE)) %>% 
   ungroup() %>% 
   distinct(event_smas_history_id, year, median_TDS, .keep_all = TRUE) %>% 
   ggplot(aes(US_L3NAME, median_TDS))+
@@ -199,7 +199,7 @@ lakes_cond_epi<-lakes_cond %>%
   filter(RSLT_PROFILE_DEPTH<=2) %>%
   select(LAKE_HISTORY_ID, RSLT_RESULT_VALUE, RSLT_PROFILE_DEPTH) %>% 
   group_by(LAKE_HISTORY_ID) %>% 
-  mutate(median_spc = median(RSLT_RESULT_VALUE)) %>% 
+  mutate(median_spc = median(RSLT_RESULT_VALUE, na.rm = TRUE)) %>% 
   ungroup() %>% 
   distinct(LAKE_HISTORY_ID, median_spc)
 
@@ -244,7 +244,7 @@ lakes_cond_hypo<-lakes_cond %>%
 lakes_cond_hypo<-lakes_cond_hypo %>% 
   select(LAKE_HISTORY_ID, RSLT_RESULT_VALUE, RSLT_PROFILE_DEPTH) %>% 
   group_by(LAKE_HISTORY_ID) %>% 
-  mutate(median_spc = median(RSLT_RESULT_VALUE)) %>% 
+  mutate(median_spc = median(RSLT_RESULT_VALUE, na.rm = TRUE)) %>% 
   ungroup() %>% 
   distinct(LAKE_HISTORY_ID, median_spc)
 
@@ -337,7 +337,7 @@ predicted_stream_TDS_classification_boxplot<-merged_conduct_all_streams %>%
     TRUE~SITE_WQ_STANDARD
   )) %>% 
   group_by(event_smas_history_id) %>%
-  mutate(median_TDS = median(pred_TDS)) %>% 
+  mutate(median_TDS = median(pred_TDS, na.rm = TRUE)) %>% 
   ungroup() %>%
   ggplot(aes(SITE_WQ_STANDARD, median_TDS))+
   geom_boxplot()+
@@ -363,7 +363,7 @@ predicted_stream_TDS_classification_stats<-merged_conduct_all_streams %>%
   ungroup() %>% 
   distinct(event_smas_history_id, median_TDS, .keep_all = TRUE) %>% 
   group_by(SITE_WQ_STANDARD) %>% 
-  mutate(median = median(median_TDS)) %>% 
+  mutate(median = median(median_TDS, na.rm = TRUE)) %>% 
   mutate(q_25 = quantile(median_TDS, probs = 0.25)) %>% 
   mutate(q_80 = quantile(median_TDS, probs = 0.80)) %>% 
   mutate(q_75 = quantile(median_TDS, probs = 0.75)) %>% 
@@ -434,7 +434,7 @@ predicted_lake_epi_TDS_classification_stats<-lakes_TDS_epi %>%
     TRUE~LOCATION_WATERBODY_CLASSIFICATION
   )) %>% 
   group_by(LOCATION_WATERBODY_CLASSIFICATION) %>% 
-  mutate(median = median(pred_median_TDS)) %>% 
+  mutate(median = median(pred_median_TDS, na.rm = TRUE)) %>% 
   mutate(q_25 = quantile(pred_median_TDS, probs = 0.25)) %>% 
   mutate(q_80 = quantile(pred_median_TDS, probs = 0.80)) %>% 
   mutate(q_75 = quantile(pred_median_TDS, probs = 0.75)) %>% 
@@ -503,7 +503,7 @@ predicted_lake_hypo_TDS_classification_stats<-lakes_TDS_hypo %>%
     TRUE~LOCATION_WATERBODY_CLASSIFICATION
   )) %>% 
   group_by(LOCATION_WATERBODY_CLASSIFICATION) %>% 
-  mutate(median = median(pred_median_TDS)) %>% 
+  mutate(median = median(pred_median_TDS, na.rm = TRUE)) %>% 
   mutate(q_25 = quantile(pred_median_TDS, probs = 0.25)) %>% 
   mutate(q_80 = quantile(pred_median_TDS, probs = 0.80)) %>% 
   mutate(q_75 = quantile(pred_median_TDS, probs = 0.75)) %>% 
@@ -547,7 +547,7 @@ stream_chloride_ecoregions_stats<-merged_chloride %>%
   ungroup() %>% 
   distinct(event_smas_history_id, median_chloride, .keep_all = TRUE) %>% 
   group_by(US_L3CODE) %>% 
-  mutate(median = median(median_chloride)) %>% 
+  mutate(median = median(median_chloride, na.rm = TRUE)) %>% 
   mutate(q_25 = quantile(median_chloride, probs = 0.25)) %>% 
   mutate(q_80 = quantile(median_chloride, probs = 0.80)) %>% 
   mutate(q_75 = quantile(median_chloride, probs = 0.75)) %>% 
@@ -563,7 +563,7 @@ stream_chloride_ecoregions_stats<-merged_chloride %>%
  stream_chloride_ecoregion_plot<-merged_chloride %>%
   filter(!is.na(US_L3NAME)) %>% 
   group_by(event_smas_history_id) %>%
-  mutate(median_chloride = median(CHLORIDE)) %>% 
+  mutate(median_chloride = median(CHLORIDE, na.rm = TRUE)) %>% 
   ungroup() %>% 
   distinct(event_smas_history_id, median_chloride, .keep_all = TRUE) %>% 
   ggplot(aes(US_L3NAME, median_chloride))+
@@ -597,8 +597,9 @@ lake_ecoregions_chloride <- read_csv(file.path(here::here(),
                               "data",
                               "lake_ecoregions_chloride.csv"))
 
-lakes_chloride<-newdata %>% 
-  filter(RSLT_VALIDATOR_QUALIFIER!="R") %>% 
+lakes_chloride<-newdata %>%
+  mutate(RSLT_RESULT_VALUE=ifelse(RSLT_VALIDATOR_QUALIFIER=="U",RSLT_METHOD_DETECTION_LIMIT/2,RSLT_RESULT_VALUE)) %>% 
+  filter(RSLT_VALIDATOR_QUALIFIER!="R" | is.na(RSLT_VALIDATOR_QUALIFIER)| RSLT_VALIDATOR_QUALIFIER=="U") %>% 
   filter(CHARACTERISTIC_NAME == "CHLORIDE") %>% 
   filter(SAMPLE_DATE > "2001/01/01")
 
@@ -607,7 +608,7 @@ lakes_chloride_epi<-lakes_chloride %>%
   filter(INFORMATION_TYPE =="OW") %>%
   select(LAKE_HISTORY_ID, RSLT_RESULT_VALUE) %>% 
   group_by(LAKE_HISTORY_ID) %>% 
-  mutate(median_chloride = median(RSLT_RESULT_VALUE)) %>% 
+  mutate(median_chloride = median(RSLT_RESULT_VALUE, na.rm = TRUE)) %>% 
   ungroup() %>% 
   distinct(LAKE_HISTORY_ID, median_chloride)
 
@@ -641,7 +642,7 @@ lakes_chloride_hypo<-lakes_chloride %>%
   filter(INFORMATION_TYPE =="BS") %>%
   select(LAKE_HISTORY_ID, RSLT_RESULT_VALUE) %>% 
   group_by(LAKE_HISTORY_ID) %>% 
-  mutate(median_chloride = median(RSLT_RESULT_VALUE)) %>% 
+  mutate(median_chloride = median(RSLT_RESULT_VALUE, na.rm = TRUE)) %>% 
   ungroup() %>% 
   distinct(LAKE_HISTORY_ID, median_chloride)
 
@@ -732,7 +733,7 @@ stream_chloride_classification_boxplot<-merged_chloride %>%
     TRUE~SITE_WQ_STANDARD
   )) %>% 
   group_by(event_smas_history_id) %>%
-  mutate(median_chloride = median(CHLORIDE)) %>% 
+  mutate(median_chloride = median(CHLORIDE, na.rm=TRUE)) %>% 
   ungroup() %>%
   ggplot(aes(SITE_WQ_STANDARD, median_chloride))+
   geom_boxplot()+
@@ -754,7 +755,7 @@ stream_chloride_classification_stats<-merged_chloride %>%
     TRUE~SITE_WQ_STANDARD
   )) %>% 
   group_by(event_smas_history_id) %>%
-  mutate(median_chloride = median(CHLORIDE)) %>% 
+  mutate(median_chloride = median(CHLORIDE, na.rm = TRUE)) %>% 
   ungroup() %>% 
   distinct(event_smas_history_id, median_chloride, .keep_all = TRUE) %>% 
   group_by(SITE_WQ_STANDARD) %>% 
@@ -796,8 +797,9 @@ No lakes in NYS are classified as A-S
 lake_classifications<-location %>% 
   distinct(LAKE_HISTORY_ID, LOCATION_WATERBODY_CLASSIFICATION)
 
-lakes_chloride<-newdata %>% 
-  filter(RSLT_VALIDATOR_QUALIFIER!="R") %>% 
+lakes_chloride<-newdata %>%
+  mutate(RSLT_RESULT_VALUE=ifelse(RSLT_VALIDATOR_QUALIFIER=="U",RSLT_METHOD_DETECTION_LIMIT/2,RSLT_RESULT_VALUE)) %>% 
+  filter(RSLT_VALIDATOR_QUALIFIER!="R" | is.na(RSLT_VALIDATOR_QUALIFIER)| RSLT_VALIDATOR_QUALIFIER=="U") %>% 
   filter(CHARACTERISTIC_NAME == "CHLORIDE") %>% 
   filter(SAMPLE_DATE > "2001/01/01")
 
@@ -879,8 +881,9 @@ lake_epi_chloride_classification_boxplot
 lake_classifications<-location %>% 
   distinct(LAKE_HISTORY_ID, LOCATION_WATERBODY_CLASSIFICATION)
 
-lakes_chloride<-newdata %>% 
-  filter(RSLT_VALIDATOR_QUALIFIER!="R") %>% 
+lakes_chloride<-newdata %>%
+  mutate(RSLT_RESULT_VALUE=ifelse(RSLT_VALIDATOR_QUALIFIER=="U",RSLT_METHOD_DETECTION_LIMIT/2,RSLT_RESULT_VALUE)) %>% 
+  filter(RSLT_VALIDATOR_QUALIFIER!="R" | is.na(RSLT_VALIDATOR_QUALIFIER)| RSLT_VALIDATOR_QUALIFIER=="U") %>% 
   filter(CHARACTERISTIC_NAME == "CHLORIDE") %>% 
   filter(SAMPLE_DATE > "2001/01/01")
 
