@@ -15,6 +15,10 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(Metrics)
 library(kableExtra)
+library(leaflet)
+library(htmltools)
+library(DT)
+library(leaflegend)
 merged_tds <- read_csv(file.path(here::here(),
                               "data",
                               "merged_tds.csv"))
@@ -1015,9 +1019,6 @@ merged_chloride_tds_plot2<-merged_chloride_tds %>%
   coord_cartesian(xlim = c(0,2000), ylim = c(0, 1000))
 
 merged_chloride_tds_plot2
-
-merged_chloride_tds<-merged_chloride_tds %>% 
-  mutate(TDS_to_Cl = (TOTAL.DISSOLVED.SOLIDS / CHLORIDE))
 ```
 
 
@@ -1055,5 +1056,184 @@ kable(
 
 
 ```
+
+## Median Stream TDS Values by Site 
+
+```{r, SMAS median actual and predicted TDS vales, echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+merged_tds <- read_csv(file.path(here::here(),
+                              "data",
+                              "merged_tds.csv"))
+median_actual_tds<-merged_tds %>% 
+  group_by(event_smas_history_id) %>%
+  mutate(median = median(TOTAL.DISSOLVED.SOLIDS, na.rm = TRUE)) %>% 
+  distinct(event_smas_history_id, median, .keep_all = TRUE) %>% 
+  select(event_smas_history_id, event_smas_sample_date, L3_KEY, median, latitude, longitude) %>% 
+  rename("Site ID" = event_smas_history_id, "Sample Date" = event_smas_sample_date, "Median TDS (mg/L)" = median, "Ecoregion Number / Name" = L3_KEY)
+
+smas_sites<- read_csv(file.path(here::here(),
+                              "data",
+                              "SMAS_Master_S_Site_v2_created_2021_12_07.csv"))
+
+smas_sites<-smas_sites %>% 
+  select(SITE_HISTORY_ID, SITE_LATITUDE, SITE_LONGITUDE) %>% 
+  rename(event_smas_history_id = SITE_HISTORY_ID, latitude = SITE_LATITUDE, longitude = SITE_LONGITUDE)
+
+
+merged_conduct_all_streams<-inner_join(smas_sites, merged_conduct_all_streams, by = "event_smas_history_id")
+
+
+median_predicted_tds<-merged_conduct_all_streams %>% 
+  group_by(event_smas_history_id) %>%
+  mutate(median = median(pred_TDS, na.rm = TRUE)) %>% 
+  distinct(event_smas_history_id, median, .keep_all = TRUE) %>% 
+  select(event_smas_history_id, event_smas_sample_date, L3_KEY, median, latitude, longitude) %>% 
+  rename("Site ID" = event_smas_history_id, "Sample Date" = event_smas_sample_date, "Median TDS (mg/L)" = median, "Ecoregion Number / Name" = L3_KEY)
+
+```
+
+
+```{r, print max and actual SMAS TDS datatables, echo=FALSE, warning=FALSE, message=FALSE}
+
+datatable(median_actual_tds, filter = 'top', caption = "Table 16: Maximum Actual TDS by Site",  extensions = "Buttons", options = list(scrollY="400px", scrollX=TRUE, paging=FALSE, dom = 'Bfrtip', buttons = c('csv', 'excel')))
+
+datatable(median_predicted_tds, filter = 'top', caption = "Table 17: Maximum predicted TDS by Site", extensions = "Buttons", options = list(scrollY="400px", scrollX=TRUE, paging=FALSE, dom = 'Bfrtip', buttons = c('csv', 'excel')))
+
+```
+
+
+```{r, print max and actual SMAS TDS maps, echo=FALSE, warning=FALSE, message=FALSE, fig.cap= c("Figure 19: Map of actual maximum TDS by site", "Figure 20: Map of predicted maximum TDS by site")}
+
+my_bins <-c(0, 10, 100, 250, 500, 1000, 2000, 3000, 4000, Inf) 
+my_pal<-colorBin(palette = "Spectral", bins = my_bins, domain = median_actual_tds$`Median TDS (mg/L)`, reverse = TRUE)
+
+  median_actual_tds %>% 
+  leaflet() %>%
+  addTiles() %>%  # Add default OpenStreetMap map tiles
+  addCircleMarkers( radius = 2, opacity = 1,
+label = ~htmlEscape(`Site ID`),
+popup = ~paste0("<br/>Site ID:",`Site ID`,"<br/>TDS (mg/L):", `Median TDS (mg/L)`),
+color = ~my_pal(median_actual_tds$`Median TDS (mg/L)`)) %>% 
+    addLegend("bottomright", pal = my_pal, values = ~`Median TDS (mg/L)`,
+    title = "Median TDS (mg/L)",
+    labFormat = labelFormat(),
+    opacity = 1
+  )
+
+my_bins <-c(0, 10, 100, 250, 500, 1000, 2000, 3000, 4000, Inf) 
+my_pal<-colorBin(palette = "Spectral", bins = my_bins, domain = median_predicted_tds$`Median TDS (mg/L)`, reverse = TRUE)
+  
+  median_predicted_tds %>% 
+  leaflet() %>%
+  addTiles() %>%  # Add default OpenStreetMap map tiles
+  addCircleMarkers( radius = 2, opacity = 1,
+label = ~htmlEscape(`Site ID`),
+popup = ~paste0("<br/>Site ID:",`Site ID`,"<br/>TDS (mg/L):", `Median TDS (mg/L)`),
+color = ~my_pal(median_predicted_tds$`Median TDS (mg/L)`)) %>% 
+    addLegend("bottomright", pal = my_pal, values = ~`Median TDS (mg/L)`,
+    title = "Predicted Median TDS (mg/L)",
+    labFormat = labelFormat(),
+    opacity = 1
+  )
+
+```
+
+
+```{r, max lake TDS values by site, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+lakes_cond<-newdata %>%
+  #filter(RSLT_VALIDATOR_QUALIFIER!="R") %>% 
+  filter(CHARACTERISTIC_NAME == "SPECIFIC CONDUCTANCE") %>% 
+  filter(INFORMATION_TYPE == "DP") %>% 
+  filter(SAMPLE_DATE > "2001/01/01")
+
+
+lakes_cond_epi<-lakes_cond %>% 
+  filter(RSLT_PROFILE_DEPTH<=2) %>%
+  select(LAKE_HISTORY_ID, RSLT_RESULT_VALUE, RSLT_PROFILE_DEPTH, SAMPLE_DATE) %>% 
+  group_by(LAKE_HISTORY_ID) %>% 
+  mutate(max_spc = max(RSLT_RESULT_VALUE, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  distinct(LAKE_HISTORY_ID, max_spc, .keep_all = TRUE)
+
+lakes_TDS_epi<-lakes_cond_epi %>% 
+  mutate(pred_max_TDS=3.965894+(0.563565*max_spc))
+
+
+lakes_TDS_epi_max<-inner_join(lakes_TDS_epi, lake_ecoregions, by = "LAKE_HISTORY_ID")
+
+lakes_TDS_epi_max<-lakes_TDS_epi_max %>% 
+  select(LAKE_HISTORY_ID, SAMPLE_DATE, pred_max_TDS, LOCATION_Y, LOCATION_X, L3_KEY) %>% 
+  rename("Site ID" = LAKE_HISTORY_ID, "Sample Date" = SAMPLE_DATE, "Max TDS (mg/L)" = pred_max_TDS, "Ecoregion Number / Name" = L3_KEY, latitude = LOCATION_Y, longitude = LOCATION_X)
+
+
+lakes_cond_hypo_max<-lakes_cond %>%
+  select(LAKE_HISTORY_ID, SAMPLE_DATE, RSLT_RESULT_VALUE, RSLT_PROFILE_DEPTH) %>%
+  filter(RSLT_PROFILE_DEPTH > 5.0) %>% 
+  group_by(LAKE_HISTORY_ID, SAMPLE_DATE) %>% 
+  mutate(max_profile_depth = max(RSLT_PROFILE_DEPTH)) %>% 
+  mutate(profile_bottom_depth_interval = max_profile_depth - 2) %>%
+  filter(RSLT_PROFILE_DEPTH>=profile_bottom_depth_interval) %>% 
+  ungroup()
+
+
+lakes_cond_hypo_max<-lakes_cond_hypo_max %>% 
+  select(LAKE_HISTORY_ID, RSLT_RESULT_VALUE, RSLT_PROFILE_DEPTH, SAMPLE_DATE) %>% 
+  group_by(LAKE_HISTORY_ID) %>% 
+  mutate(max_spc = max(RSLT_RESULT_VALUE, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  distinct(LAKE_HISTORY_ID, max_spc, .keep_all = TRUE)
+
+lakes_TDS_hypo_max<-lakes_cond_hypo_max %>% 
+  mutate(pred_max_TDS=3.965894+(0.563565*max_spc))
+
+lakes_TDS_hypo_max<-inner_join(lakes_TDS_hypo_max, lake_ecoregions, by ="LAKE_HISTORY_ID")
+
+lakes_TDS_hypo_max<-lakes_TDS_hypo_max %>% 
+  select(LAKE_HISTORY_ID, SAMPLE_DATE, pred_max_TDS, LOCATION_Y, LOCATION_X, L3_KEY) %>% 
+  rename("Site ID" = LAKE_HISTORY_ID, "Sample Date" = SAMPLE_DATE, "Max TDS (mg/L)" = pred_max_TDS, "Ecoregion Number / Name" = L3_KEY, latitude = LOCATION_Y, longitude = LOCATION_X)
+
+```
+
+```{r, print max LMAS max predicted TDS datatables epi and hypo, echo=FALSE, warning=FALSE, message=FALSE}
+
+datatable(lakes_TDS_epi_max, filter = 'top', caption = "Table 18: Maximum predicted epilimnetic TDS by site",  extensions = "Buttons", options = list(scrollY="400px", scrollX=TRUE, paging=FALSE, dom = 'Bfrtip', buttons = c('csv', 'excel')))
+
+datatable(lakes_TDS_hypo_max, filter = 'top', caption = "Table 19:Maximum predicted hypolimnetic TDS by site", extensions = "Buttons", options = list(scrollY="400px", scrollX=TRUE, paging=FALSE, dom = 'Bfrtip', buttons = c('csv', 'excel')))
+
+```
+
+```{r, print max LMAS max predicted TDS maps epi and hypo, echo=FALSE, warning=FALSE, message=FALSE, fig.cap= c("Figure 19: Map of actual maximum TDS by site", "Figure 20: Map of predicted maximum TDS by site")}
+
+
+my_bins <-c(0, 10, 100, 250, 500, 1000, 2000, 3000, 4000, Inf) 
+my_pal<-colorBin(palette = "Spectral", bins = my_bins, domain = lakes_TDS_epi_max$`Max TDS (mg/L)`, reverse = TRUE)
+  
+  lakes_TDS_epi_max %>% 
+  leaflet() %>%
+  addTiles() %>%  # Add default OpenStreetMap map tiles
+  addCircleMarkers( radius = 2, opacity = 1,
+label = ~htmlEscape(`Site ID`),
+popup = ~paste0("<br/>Site ID:",`Site ID`,"<br/>TDS (mg/L):", `Max TDS (mg/L)`),
+color = ~my_pal(lakes_TDS_epi_max$`Max TDS (mg/L)`)) %>% 
+    addLegend("bottomright", pal = my_pal, values = ~`Max TDS (mg/L)`,
+    title = "Predicted Max TDS (mg/L)",
+    labFormat = labelFormat(),
+    opacity = 1
+  )
+  
+    lakes_TDS_hypo_max %>% 
+  leaflet() %>%
+  addTiles() %>%  # Add default OpenStreetMap map tiles
+  addCircleMarkers( radius = 2, opacity = 1,
+label = ~htmlEscape(`Site ID`),
+popup = ~paste0("<br/>Site ID:",`Site ID`,"<br/>TDS (mg/L):", `Max TDS (mg/L)`),
+color = ~my_pal(lakes_TDS_epi_max$`Max TDS (mg/L)`)) %>% 
+    addLegend("bottomright", pal = my_pal, values = ~`Max TDS (mg/L)`,
+    title = "Predicted Max TDS (mg/L)",
+    labFormat = labelFormat(),
+    opacity = 1
+  )
+  
+```
+
 
 
